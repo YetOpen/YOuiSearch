@@ -32,4 +32,5 @@ Available methods: company, address, country.
 Links
 -----
 [YetOpen](http://www.yetopen.it)
+
 [YetOpen's gitHub](https://github.com/YetOpen/)

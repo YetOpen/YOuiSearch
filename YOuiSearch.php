@@ -28,16 +28,12 @@ class YOuiSearch extends CApplicationComponent
      * @return \YOuiSearch|null
      */
     public function lookup($mac = "") {
-        $this->_ouiCache = NULL;
         if (empty($mac))
             return NULL;
         $mac = $this->_normalize($mac);
-        try {
-            $this->_search($mac);
-        } catch (CHttpException $e) {
-            Yii::log(get_class()." Unable to lookup mac: ".$e->getMessage());
-        }
-        return $this;
+        $oui = substr(str_replace("-","",$mac),0,6);
+        $this->_search($mac);
+        return $this->_ouiCache[$oui];
     }
 
     /**
@@ -84,34 +80,37 @@ class YOuiSearch extends CApplicationComponent
             curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
             $curl_response = curl_exec($curl);
             if ($curl_response === false) {
-                throw new CHttpException("Unable to contact macvendorlookup.com", 500);
+                Yii::trace("curl exec error", get_class());
+                $oc = $this->_emptyRecord($oui);
+            } else {
+                $data = CJSON::decode($curl_response);
+                $oc = new OuiCache();
+                if (!empty($data[0]['company'])) {
+                    $oc->base = $oui;
+                    $oc->company = substr($data[0]['company'], 0, 255);
+                    $oc->address = $data[0]['addressL1']." ".$data[0]['addressL2']." ".$data[0]['addressL3'];
+                    $oc->country = substr($data[0]['country'], 0, 255);
+                    $oc->created_on = date("Y-m-d H:i:s");
+                    $oc->save();
+                } else {
+                    Yii::trace("empty response", get_class());
+                    $oc = $this->_emptyRecord($oui);
+                }
             }
-            $data = CJSON::decode($curl_response);
-            if (empty($data[0]['company']))
-                throw new CHttpException("Empty data from macvendorlookup.com", 500);
-            $oc = new OuiCache();
-            $oc->base = $oui;
-            $oc->company = substr($data[0]['company'], 0, 255);
-            $oc->address = $data[0]['addressL1']." ".$data[0]['addressL2']." ".$data[0]['addressL3'];
-            $oc->country = substr($data[0]['country'], 0, 255);
-            $oc->created_on = date("Y-m-d H:i:s");
-            $oc->save();
             curl_close($curl);
         }
-        $this->_ouiCache = $oc;
+        $this->_ouiCache[$oui] = $oc;
     }
 
-    public function __get($name)
-    {
-            // FIXME
-        if ($this->_ouiCache) 
-            return $this->_ouiCache->$name;
-        else
-            return $this->msgIfNotAvailable;
-    }
-    
     public function init()
     {
         parent::init();
+    }
+    
+    private function _emptyRecord ($oui) {
+        $o = new OuiCache;
+        foreach ($o->attributeNames() as $l)
+            $o->$l = $this->msgIfNotAvailable;
+        return $o;
     }
 }
