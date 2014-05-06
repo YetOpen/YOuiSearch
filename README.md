@@ -29,6 +29,11 @@ echo Yii::app()->YOuiCache->lookup($yourMac)->company;
 ```
 Available methods: company, address, country. 
 
+Requirements
+------------
+* php5-curl
+* database to store cached records
+
 Links
 -----
 [YetOpen](http://www.yetopen.it)
